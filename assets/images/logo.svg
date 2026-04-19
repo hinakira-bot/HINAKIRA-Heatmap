@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="heat" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#00a32a"/>
+      <stop offset="40%" stop-color="#f0b849"/>
+      <stop offset="100%" stop-color="#d63638"/>
+    </linearGradient>
+    <linearGradient id="bar1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d63638"/>
+      <stop offset="100%" stop-color="#e27730"/>
+    </linearGradient>
+    <linearGradient id="bar2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e27730"/>
+      <stop offset="100%" stop-color="#f0b849"/>
+    </linearGradient>
+    <linearGradient id="bar3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0b849"/>
+      <stop offset="100%" stop-color="#7ad03a"/>
+    </linearGradient>
+    <linearGradient id="bar4" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7ad03a"/>
+      <stop offset="100%" stop-color="#00a32a"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="248" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="248" fill="none" stroke="#2271b1" stroke-width="4" opacity="0.5"/>
+
+  <!-- Heat bars (stylized bar chart) -->
+  <g filter="url(#glow)">
+    <!-- Bar 1 - tallest (red/hot) -->
+    <rect x="120" y="130" width="52" height="220" rx="8" fill="url(#bar1)" opacity="0.95"/>
+    <!-- Bar 2 -->
+    <rect x="188" y="170" width="52" height="180" rx="8" fill="url(#bar2)" opacity="0.95"/>
+    <!-- Bar 3 -->
+    <rect x="256" y="200" width="52" height="150" rx="8" fill="url(#bar3)" opacity="0.95"/>
+    <!-- Bar 4 - shortest (green/cool) -->
+    <rect x="324" y="240" width="52" height="110" rx="8" fill="url(#bar4)" opacity="0.95"/>
+  </g>
+
+  <!-- Heat dots overlay -->
+  <circle cx="146" cy="180" r="12" fill="#d63638" opacity="0.7" filter="url(#glow)"/>
+  <circle cx="214" cy="220" r="10" fill="#e27730" opacity="0.6" filter="url(#glow)"/>
+  <circle cx="282" cy="260" r="8" fill="#f0b849" opacity="0.6" filter="url(#glow)"/>
+  <circle cx="350" cy="290" r="6" fill="#7ad03a" opacity="0.5" filter="url(#glow)"/>
+
+  <!-- Baseline -->
+  <line x1="100" y1="358" x2="396" y2="358" stroke="#a7aaad" stroke-width="2" stroke-dasharray="6 4" opacity="0.5"/>
+
+  <!-- "H" letter accent -->
+  <text x="256" y="420" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="800" fill="#ffffff" letter-spacing="6">HINAKIRA</text>
+  <text x="256" y="452" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="400" fill="#72aee6" letter-spacing="8">HEATMAP</text>
+</svg>
