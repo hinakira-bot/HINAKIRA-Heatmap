@@ -49,6 +49,7 @@ class WBH_Tracker {
 			'postId' => $post_id,
 			'apiUrl' => esc_url_raw( rest_url( 'wbh/v1/track' ) ),
 			'nonce'  => wp_create_nonce( 'wp_rest' ),
+			'token'  => WBH_REST_API::generate_track_token(),
 		) );
 	}
 }

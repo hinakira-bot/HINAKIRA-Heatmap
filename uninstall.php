@@ -29,5 +29,12 @@ wp_clear_scheduled_hook( 'wbh_daily_cleanup' );
 
 // Transientクリーンアップ（wbh_で始まるもの）
 $wpdb->query(
-	"DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_wbh_%' OR option_name LIKE '_transient_timeout_wbh_%'"
+	$wpdb->prepare(
+		"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+		$wpdb->esc_like( '_transient_wbh_' ) . '%',
+		$wpdb->esc_like( '_transient_timeout_wbh_' ) . '%'
+	)
 );
+
+// オブジェクトキャッシュのクリア（Redis/Memcached環境対応）
+wp_cache_flush_group( 'wbh_rate_limit' );

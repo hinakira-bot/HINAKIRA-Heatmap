@@ -14,7 +14,7 @@ class WBH_Admin_Page {
 		add_menu_page(
 			'HINAKIRA Heatmap',
 			'HINAKIRA Heatmap',
-			'edit_posts',
+			'manage_options',
 			'wp-blog-heatmap',
 			array( __CLASS__, 'render_page' ),
 			'dashicons-chart-area',
@@ -34,7 +34,7 @@ class WBH_Admin_Page {
 			WBH_VERSION
 		);
 
-		// Chart.js
+		// Chart.js（SRI付き）
 		wp_enqueue_script(
 			'chartjs',
 			'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
@@ -42,6 +42,17 @@ class WBH_Admin_Page {
 			'4.4.4',
 			true
 		);
+		// SRI integrity ハッシュを追加
+		add_filter( 'script_loader_tag', function( $tag, $handle ) {
+			if ( 'chartjs' === $handle ) {
+				$tag = str_replace(
+					' src=',
+					' integrity="sha384-6BWFQ7q9TO+kyOClyBMGIYBMbOm1e3YNWE/MIWBjQPN5HIYBr/UWaFMtiHYqEzC" crossorigin="anonymous" src=',
+					$tag
+				);
+			}
+			return $tag;
+		}, 10, 2 );
 
 		wp_enqueue_script(
 			'wbh-dashboard',
@@ -57,6 +68,23 @@ class WBH_Admin_Page {
 			'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
 			'nonce'    => wp_create_nonce( 'wbh_admin_nonce' ),
 			'settings' => $settings,
+			'i18n'     => array(
+				'selectPost'      => '記事を選択してください',
+				'loadingData'     => 'データを読み込み中...',
+				'noData'          => 'データがまだありません。アクセスデータが溜まるまでお待ちください。',
+				'loadFailed'      => 'データの取得に失敗しました',
+				'saveFailed'      => '設定の保存に失敗しました',
+				'cleanupFailed'   => 'クリーンアップに失敗しました',
+				'cleanupConfirm'  => '保持期間を過ぎた古いデータを削除します。よろしいですか？',
+				'noDataShort'     => 'データなし',
+				'noDataTable'     => 'データがありません',
+				'reachPct'        => '読者の {pct}% が到達',
+				'remainPct'       => '読者の {pct}% が残存',
+				'scrollDepth'     => 'スクロール深度',
+				'reachRate'       => '到達率 (%)',
+				'readerRetention' => '読者残存率',
+				'selectPostFirst' => '記事を選択...',
+			),
 		) );
 	}
 
@@ -351,7 +379,7 @@ class WBH_Admin_Page {
 								軽量なJavaScript（約3KB）がページに挿入され、訪問者のクリック位置・スクロール深度・ページビューを匿名で記録します。</p>
 								<div class="wbh-step-note">
 									<span class="dashicons dashicons-shield"></span>
-									IPアドレスやCookieなどの個人情報は一切保存しません
+									IPアドレスやCookieの生データは保存しません（ユニーク推定に不可逆ハッシュのみ使用）
 								</div>
 							</div>
 						</div>
@@ -439,7 +467,7 @@ class WBH_Admin_Page {
 								プライバシーについて
 							</button>
 							<div class="wbh-faq-answer">
-								<p>このプラグインは個人を特定する情報（IPアドレス、Cookie、ユーザーエージェント）を一切保存しません。GDPR・プライバシーポリシーにも対応しています。</p>
+								<p>IPアドレスやCookieの生データはデータベースに保存されません。ユニーク訪問者の推定にはIPの不可逆ハッシュ（毎日変更）を一時的に使用しますが、元のIPに復元することはできません。GDPR対応のプライバシーポリシー提案テキストも自動生成されます。</p>
 							</div>
 						</div>
 

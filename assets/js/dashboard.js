@@ -2,6 +2,7 @@
 	'use strict';
 
 	var D = window.wbhDashboard || {};
+	var L = D.i18n || {};
 	var scrollChart = null;
 	var attentionChart = null;
 
@@ -69,7 +70,7 @@
 		var dateTo = todayStr();
 		var dateFrom = daysAgo(period);
 
-		$('#wbh-treemap').html('<div class="wbh-loading"><span class="spinner is-active"></span> データを読み込み中...</div>');
+		$('#wbh-treemap').html('<div class="wbh-loading"><span class="spinner is-active"></span> ' + escHtml(L.loadingData || 'データを読み込み中...') + '</div>');
 
 		ajax('wbh_get_performance_map', {
 			date_from: dateFrom,
@@ -80,7 +81,7 @@
 			renderTreemap(data);
 			renderPerformanceTable(data);
 		}, function() {
-			$('#wbh-treemap').html('<div class="wbh-empty-state"><p>データの取得に失敗しました</p></div>');
+			$('#wbh-treemap').html('<div class="wbh-empty-state"><p>' + escHtml(L.loadFailed || 'データの取得に失敗しました') + '</p></div>');
 		});
 	}
 
@@ -113,7 +114,7 @@
 		$map.empty();
 
 		if (data.length === 0) {
-			$map.html('<div class="wbh-empty-state"><span class="dashicons dashicons-chart-area"></span><p>データがまだありません。アクセスデータが溜まるまでお待ちください。</p></div>');
+			$map.html('<div class="wbh-empty-state"><span class="dashicons dashicons-chart-area"></span><p>' + escHtml(L.noData || 'データがまだありません') + '</p></div>');
 			return;
 		}
 
@@ -173,9 +174,9 @@
 		$map.on('mouseenter', '.wbh-treemap-cell', function(e) {
 			var $el = $(this);
 			$tooltip.html(
-				'<strong>' + escHtml($el.data('title')) + '</strong>' +
-				'PV: ' + numberFormat($el.data('pv')) + '<br>' +
-				'ユニーク: ' + numberFormat($el.data('unique'))
+				'<strong>' + escHtml(String($el.data('title') || '')) + '</strong>' +
+				'PV: ' + escHtml(numberFormat($el.data('pv'))) + '<br>' +
+				'ユニーク: ' + escHtml(numberFormat($el.data('unique')))
 			).show();
 		}).on('mousemove', '.wbh-treemap-cell', function(e) {
 			$tooltip.css({ top: e.clientY + 12, left: e.clientX + 12 });
@@ -195,7 +196,7 @@
 		$tbody.empty();
 
 		if (data.length === 0) {
-			$tbody.html('<tr><td colspan="5" style="text-align:center;padding:20px;color:#787c82;">データがありません</td></tr>');
+			$tbody.html('<tr><td colspan="5" style="text-align:center;padding:20px;color:#787c82;">' + escHtml(L.noDataTable || 'データがありません') + '</td></tr>');
 			return;
 		}
 
@@ -276,7 +277,7 @@
 	$('#wbh-click-reload').on('click', function() {
 		var postId = $('#wbh-click-post').val();
 		if (!postId) {
-			alert('記事を選択してください');
+			alert(L.selectPost || '記事を選択してください');
 			return;
 		}
 
@@ -315,7 +316,10 @@
 
 		if (!data.post_url) return;
 
-		iframe.src = data.post_url;
+		// URLのプロトコルをhttp/httpsに制限（javascript:等を防止）
+		var url = data.post_url;
+		if (url.indexOf('http://') !== 0 && url.indexOf('https://') !== 0) return;
+		iframe.src = url;
 
 		iframe.onload = function() {
 			// iframeのコンテンツサイズに合わせてcanvasを調整
@@ -399,7 +403,7 @@
 	$('#wbh-scroll-reload').on('click', function() {
 		var postId = $('#wbh-scroll-post').val();
 		if (!postId) {
-			alert('記事を選択してください');
+			alert(L.selectPost || '記事を選択してください');
 			return;
 		}
 
@@ -586,20 +590,20 @@
 				showNotice('success', data.message);
 				$btn.prop('disabled', false);
 			}, function() {
-				showNotice('error', '設定の保存に失敗しました');
+				showNotice('error', L.saveFailed || '設定の保存に失敗しました');
 				$btn.prop('disabled', false);
 			});
 		});
 
 		$('#wbh-manual-cleanup').on('click', function() {
-			if (!confirm('保持期間を過ぎた古いデータを削除します。よろしいですか？')) return;
+			if (!confirm(L.cleanupConfirm || '保持期間を過ぎた古いデータを削除します。よろしいですか？')) return;
 			var $btn = $(this).prop('disabled', true);
 
 			ajax('wbh_cleanup_now', {}, function(data) {
 				showNotice('success', data.message);
 				$btn.prop('disabled', false);
 			}, function() {
-				showNotice('error', 'クリーンアップに失敗しました');
+				showNotice('error', L.cleanupFailed || 'クリーンアップに失敗しました');
 				$btn.prop('disabled', false);
 			});
 		});

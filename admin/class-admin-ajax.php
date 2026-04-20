@@ -26,11 +26,14 @@ class WBH_Admin_Ajax {
 
 		$date_from  = sanitize_text_field( wp_unslash( $_POST['date_from'] ?? '' ) );
 		$date_to    = sanitize_text_field( wp_unslash( $_POST['date_to'] ?? '' ) );
-		$post_types = isset( $_POST['post_types'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['post_types'] ) ) : array( 'post' );
+		self::validate_dates( $date_from, $date_to );
 
-		if ( empty( $date_from ) || empty( $date_to ) ) {
-			$date_to   = current_time( 'Y-m-d' );
-			$date_from = gmdate( 'Y-m-d', strtotime( '-30 days' ) );
+		// 投稿タイプはホワイトリストで制限
+		$allowed_types = get_post_types( array( 'public' => true ) );
+		$post_types    = isset( $_POST['post_types'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['post_types'] ) ) : array( 'post' );
+		$post_types    = array_intersect( $post_types, $allowed_types );
+		if ( empty( $post_types ) ) {
+			$post_types = array( 'post' );
 		}
 
 		$data = WBH_Data_Manager::get_performance_data( $date_from, $date_to, $post_types );
@@ -49,10 +52,12 @@ class WBH_Admin_Ajax {
 			wp_send_json_error( array( 'message' => '記事を選択してください' ) );
 		}
 
-		if ( empty( $date_from ) || empty( $date_to ) ) {
-			$date_to   = current_time( 'Y-m-d' );
-			$date_from = gmdate( 'Y-m-d', strtotime( '-30 days' ) );
+		// ビューポートフィルタのホワイトリスト
+		if ( ! in_array( $viewport, array( 'all', 'sp', 'pc' ), true ) ) {
+			$viewport = 'all';
 		}
+
+		self::validate_dates( $date_from, $date_to );
 
 		$data = WBH_Data_Manager::get_click_data( $post_id, $date_from, $date_to, $viewport );
 
@@ -87,10 +92,11 @@ class WBH_Admin_Ajax {
 			wp_send_json_error( array( 'message' => '記事を選択してください' ) );
 		}
 
-		if ( empty( $date_from ) || empty( $date_to ) ) {
-			$date_to   = current_time( 'Y-m-d' );
-			$date_from = gmdate( 'Y-m-d', strtotime( '-30 days' ) );
+		if ( ! in_array( $viewport, array( 'all', 'sp', 'pc' ), true ) ) {
+			$viewport = 'all';
 		}
+
+		self::validate_dates( $date_from, $date_to );
 
 		$data = WBH_Data_Manager::get_scroll_data( $post_id, $date_from, $date_to, $viewport );
 		wp_send_json_success( $data );
@@ -142,10 +148,50 @@ class WBH_Admin_Ajax {
 		wp_send_json_success( array( 'message' => '設定を保存しました' ) );
 	}
 
-	private static function verify_request( $capability = 'edit_posts' ) {
-		check_ajax_referer( 'wbh_admin_nonce', 'nonce' );
+	private static function verify_request( $capability = 'manage_options' ) {
+		if ( ! check_ajax_referer( 'wbh_admin_nonce', 'nonce', false ) ) {
+			wp_send_json_error( array( 'message' => 'セキュリティトークンが無効です。ページを再読み込みしてください。' ), 403 );
+		}
 		if ( ! current_user_can( $capability ) ) {
 			wp_send_json_error( array( 'message' => '権限がありません' ), 403 );
+		}
+	}
+
+	/**
+	 * 日付バリデーション（YYYY-MM-DD形式＆論理チェック）
+	 */
+	private static function validate_dates( &$date_from, &$date_to ) {
+		$pattern = '/^\d{4}-\d{2}-\d{2}$/';
+
+		if ( empty( $date_from ) || empty( $date_to )
+			|| ! preg_match( $pattern, $date_from )
+			|| ! preg_match( $pattern, $date_to )
+		) {
+			$date_to   = current_time( 'Y-m-d' );
+			$date_from = gmdate( 'Y-m-d', strtotime( '-30 days' ) );
+			return;
+		}
+
+		// 日付の妥当性チェック
+		$from_ts = strtotime( $date_from );
+		$to_ts   = strtotime( $date_to );
+		if ( false === $from_ts || false === $to_ts ) {
+			$date_to   = current_time( 'Y-m-d' );
+			$date_from = gmdate( 'Y-m-d', strtotime( '-30 days' ) );
+			return;
+		}
+
+		// from > to なら入れ替え
+		if ( $from_ts > $to_ts ) {
+			$tmp       = $date_from;
+			$date_from = $date_to;
+			$date_to   = $tmp;
+		}
+
+		// 最大365日に制限
+		$max_range = 365 * DAY_IN_SECONDS;
+		if ( ( $to_ts - $from_ts ) > $max_range ) {
+			$date_from = gmdate( 'Y-m-d', $to_ts - $max_range );
 		}
 	}
 }

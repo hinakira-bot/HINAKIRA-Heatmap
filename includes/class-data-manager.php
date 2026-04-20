@@ -24,7 +24,7 @@ class WBH_Data_Manager {
 
 		$unique_inc = $is_unique ? 1 : 0;
 
-		$wpdb->query( $wpdb->prepare(
+		$result = $wpdb->query( $wpdb->prepare(
 			"INSERT INTO {$table} (post_id, date_key, pv_count, unique_count)
 			 VALUES (%d, %s, 1, %d)
 			 ON DUPLICATE KEY UPDATE pv_count = pv_count + 1, unique_count = unique_count + %d",
@@ -33,6 +33,10 @@ class WBH_Data_Manager {
 			$unique_inc,
 			$unique_inc
 		) );
+
+		if ( false === $result ) {
+			self::log_error( 'record_pageview', $wpdb->last_error );
+		}
 	}
 
 	/**
@@ -42,13 +46,17 @@ class WBH_Data_Manager {
 		global $wpdb;
 		$table = $wpdb->prefix . 'wbh_clicks';
 
-		$wpdb->insert( $table, array(
+		$result = $wpdb->insert( $table, array(
 			'post_id'     => $post_id,
 			'x_pct'       => $x_pct,
 			'y_px'        => $y_px,
 			'viewport_w'  => $viewport_w,
 			'element_tag' => $element_tag,
 		), array( '%d', '%f', '%d', '%d', '%s' ) );
+
+		if ( false === $result ) {
+			self::log_error( 'record_click', $wpdb->last_error );
+		}
 	}
 
 	/**
@@ -58,12 +66,16 @@ class WBH_Data_Manager {
 		global $wpdb;
 		$table = $wpdb->prefix . 'wbh_scrolls';
 
-		$wpdb->insert( $table, array(
+		$result = $wpdb->insert( $table, array(
 			'post_id'    => $post_id,
 			'max_depth'  => $max_depth,
 			'content_h'  => $content_h,
 			'viewport_w' => $viewport_w,
 		), array( '%d', '%d', '%d', '%d' ) );
+
+		if ( false === $result ) {
+			self::log_error( 'record_scroll', $wpdb->last_error );
+		}
 	}
 
 	/**
@@ -88,7 +100,8 @@ class WBH_Data_Manager {
 			   AND p.post_type IN ({$type_placeholders})
 			   AND p.post_status = 'publish'
 			 GROUP BY pv.post_id
-			 ORDER BY total_pv DESC",
+			 ORDER BY total_pv DESC
+			 LIMIT 500",
 			array_merge( array( $date_from, $date_to ), $post_types )
 		);
 
@@ -126,7 +139,7 @@ class WBH_Data_Manager {
 	}
 
 	/**
-	 * スクロールデータ取得（10%刻みの分布）
+	 * スクロールデータ取得（10%刻みの分布 — 1クエリで集約）
 	 */
 	public static function get_scroll_data( $post_id, $date_from, $date_to, $viewport_filter = 'all' ) {
 		global $wpdb;
@@ -141,12 +154,29 @@ class WBH_Data_Manager {
 			$viewport_clause = ' AND viewport_w > 768';
 		}
 
-		$total_query = $wpdb->prepare(
-			"SELECT COUNT(*) FROM {$table}
+		// 1クエリで COUNT, AVG, 10%刻み分布を同時取得（N+1解消）
+		$query = $wpdb->prepare(
+			"SELECT
+				COUNT(*) AS total,
+				ROUND(AVG(max_depth), 1) AS avg_depth,
+				SUM(CASE WHEN max_depth >= 10 THEN 1 ELSE 0 END) AS d10,
+				SUM(CASE WHEN max_depth >= 20 THEN 1 ELSE 0 END) AS d20,
+				SUM(CASE WHEN max_depth >= 30 THEN 1 ELSE 0 END) AS d30,
+				SUM(CASE WHEN max_depth >= 40 THEN 1 ELSE 0 END) AS d40,
+				SUM(CASE WHEN max_depth >= 50 THEN 1 ELSE 0 END) AS d50,
+				SUM(CASE WHEN max_depth >= 60 THEN 1 ELSE 0 END) AS d60,
+				SUM(CASE WHEN max_depth >= 70 THEN 1 ELSE 0 END) AS d70,
+				SUM(CASE WHEN max_depth >= 80 THEN 1 ELSE 0 END) AS d80,
+				SUM(CASE WHEN max_depth >= 90 THEN 1 ELSE 0 END) AS d90,
+				SUM(CASE WHEN max_depth >= 100 THEN 1 ELSE 0 END) AS d100
+			 FROM {$table}
 			 WHERE post_id = %d AND recorded_at BETWEEN %s AND %s {$viewport_clause}",
 			$params
 		);
-		$total = (int) $wpdb->get_var( $total_query );
+
+		$row = $wpdb->get_row( $query );
+
+		$total = (int) ( $row->total ?? 0 );
 
 		if ( 0 === $total ) {
 			return array(
@@ -156,31 +186,16 @@ class WBH_Data_Manager {
 			);
 		}
 
-		// 平均到達率
-		$avg_query = $wpdb->prepare(
-			"SELECT AVG(max_depth) FROM {$table}
-			 WHERE post_id = %d AND recorded_at BETWEEN %s AND %s {$viewport_clause}",
-			$params
-		);
-		$avg_depth = round( (float) $wpdb->get_var( $avg_query ), 1 );
-
-		// 10%刻みの分布
 		$distribution = array();
-		for ( $i = 0; $i < 10; $i++ ) {
-			$threshold = ( $i + 1 ) * 10;
-			$count_query = $wpdb->prepare(
-				"SELECT COUNT(*) FROM {$table}
-				 WHERE post_id = %d AND recorded_at BETWEEN %s AND %s
-				   AND max_depth >= %d {$viewport_clause}",
-				array_merge( $params, array( $threshold ) )
-			);
-			$count = (int) $wpdb->get_var( $count_query );
+		for ( $i = 1; $i <= 10; $i++ ) {
+			$key   = 'd' . ( $i * 10 );
+			$count = (int) ( $row->$key ?? 0 );
 			$distribution[] = round( ( $count / $total ) * 100, 1 );
 		}
 
 		return array(
 			'total'        => $total,
-			'avg_depth'    => $avg_depth,
+			'avg_depth'    => (float) ( $row->avg_depth ?? 0 ),
 			'distribution' => $distribution,
 		);
 	}
@@ -208,18 +223,20 @@ class WBH_Data_Manager {
 	}
 
 	/**
-	 * 記事一覧取得（セレクトボックス用）
+	 * 記事一覧取得（セレクトボックス用・最大500件）
 	 */
 	public static function get_tracked_posts() {
 		global $wpdb;
 		$table = $wpdb->prefix . 'wbh_pageviews';
 
 		return $wpdb->get_results(
-			"SELECT DISTINCT pv.post_id, p.post_title
+			"SELECT pv.post_id, p.post_title
 			 FROM {$table} pv
 			 INNER JOIN {$wpdb->posts} p ON p.ID = pv.post_id
 			 WHERE p.post_status = 'publish'
-			 ORDER BY p.post_title ASC"
+			 GROUP BY pv.post_id
+			 ORDER BY p.post_title ASC
+			 LIMIT 500"
 		);
 	}
 
@@ -263,12 +280,21 @@ class WBH_Data_Manager {
 	}
 
 	/**
-	 * 訪問者ハッシュ（個人特定不可・日次ローテーション）
+	 * 訪問者ハッシュ（擬似匿名化・日次ローテーション）
+	 * 注: IP + salt のみ使用。UAは除外しフィンガープリント精度を意図的に下げる。
 	 */
 	private static function get_visitor_hash() {
-		$ip   = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
-		$ua   = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
+		$ip   = WBH_REST_API::get_client_ip_static();
 		$salt = wp_salt( 'auth' ) . current_time( 'Y-m-d' );
-		return substr( hash( 'sha256', $ip . $ua . $salt ), 0, 12 );
+		return substr( hash( 'sha256', $ip . $salt ), 0, 16 );
+	}
+
+	/**
+	 * DBエラーをログに記録
+	 */
+	private static function log_error( $method, $error ) {
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG && $error ) {
+			error_log( sprintf( 'WBH DB Error in %s: %s', $method, $error ) );
+		}
 	}
 }

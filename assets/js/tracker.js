@@ -109,23 +109,30 @@
 		for ( var i = 0; i < items.length; i++ ) {
 			var payload = JSON.stringify( items[i] );
 
+			var headers = {
+				'Content-Type': 'application/json',
+				'X-WP-Nonce': C.nonce,
+				'X-WBH-Token': C.token || ''
+			};
+
 			if ( useBeacon && navigator.sendBeacon ) {
+				// sendBeaconではカスタムヘッダーを送れないのでURLパラメータにトークンを付与
+				var url = C.apiUrl + ( C.apiUrl.indexOf('?') !== -1 ? '&' : '?' ) + '_wbh_token=' + encodeURIComponent( C.token || '' );
 				navigator.sendBeacon(
-					C.apiUrl,
+					url,
 					new Blob( [payload], { type: 'application/json' } )
 				);
 			} else {
 				try {
 					fetch( C.apiUrl, {
 						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json',
-							'X-WP-Nonce': C.nonce
-						},
+						headers: headers,
 						body: payload,
 						keepalive: true
 					} );
-				} catch(e) {}
+				} catch(e) {
+					// ネットワークエラーは無視（トラッキングはベストエフォート）
+				}
 			}
 		}
 	}
